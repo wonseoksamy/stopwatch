@@ -1,9 +1,14 @@
-# Terran Build Stopwatch
+# Terran Frontline Stopwatch
 
-A stopwatch themed on a StarCraft-style build order. One minute = one build: Command Center, Supply Depot, Barracks, Factory, Starport, then a Battlecruiser launch.
+A cinematic stopwatch styled after a classic real-time-strategy screen. One minute = one chapter:
 
-Open stopwatch.html in a browser. Single file, no dependencies.
+- 0-19s: build a Command Center, Supply Depot and Barracks
+- 20s+: marines march out of the Barracks, the camera follows the front line
+- ~30s: Zerg attack, firefights, explosions, hydralisks
+- ~58s: the Zerg hive falls, victory, next chapter begins
 
-Keys: Space start/stop, L lap, R reset, M sound, F fullscreen.
+Open `index.html` in a browser. Single file, no dependencies, no assets.
 
-All graphics are original SVG drawings; no game assets are used. Unofficial fan project, not affiliated with Blizzard Entertainment.
+Keys: `Space` start/stop · `L` lap (shows as a chat line) · `R` reset · `M` sound · `F` fullscreen
+
+All graphics and sounds are original SVG / WebAudio. Unofficial fan project, not affiliated with Blizzard Entertainment.
