@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>테란 · 스탑워치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --grn:#5dff6b; --grn2:#2f9a3a; --cy:#4ec9ff; --amber:#ffd23a; --red:#ff3b30; --txt:#e7efe9; --dim:#7f948a; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#020303}
+  body{display:flex;align-items:center;justify-content:center;color:var(--txt);overflow:hidden;
+    font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
+
+  .screen{container-type:inline-size;width:min(100vw,calc(100vh * 800 / 460),1100px);position:relative;background:#000;
+    --f:1cqw;box-shadow:0 0 0 1px #10171a,0 20px 80px rgba(0,0,0,.85)}
+
+  /* ================= MAIN VIEW ================= */
+  .view{position:relative;aspect-ratio:800/348;overflow:hidden;background:#120d14}
+  .view>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 48% 52%,transparent 58%,rgba(0,0,0,.5) 100%),linear-gradient(180deg,rgba(0,0,0,.3),transparent 12%)}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  .flash.go{animation:flash .9s ease-out}
+  @keyframes flash{0%{opacity:.8}100%{opacity:0}}
+
+  /* resources: top-right like the game */
+  .res{position:absolute;top:.4cqw;right:1.2cqw;display:flex;gap:2.2cqw;font-family:Oxanium,sans-serif;font-weight:600;font-size:2.1cqw;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px #000}
+  .res span{display:flex;align-items:center;gap:.5cqw}
+  .res svg{width:2.2cqw;height:2.2cqw}
+  #min{color:#59c7ff}#gas{color:#5dff6b}#sup{color:#59c7ff}
+  .res .block #sup{color:var(--red)}
+
+  /* stopwatch clock overlay */
+  .clock{position:absolute;top:0;left:50%;transform:translateX(-50%);padding:.5cqw 3.2cqw .8cqw;text-align:center;
+    background:linear-gradient(180deg,rgba(0,10,4,.78),rgba(0,10,4,.5));border:1px solid rgba(93,255,107,.35);border-top:0;
+    clip-path:polygon(0 0,100% 0,calc(100% - 1.6cqw) 100%,1.6cqw 100%)}
+  .clock small{display:block;font-size:1.25cqw;letter-spacing:.35em;color:#58a863;margin-bottom:-.1cqw;padding-left:.35em}
+  .time{font-family:Oxanium,sans-serif;font-weight:800;font-size:7.6cqw;line-height:1;letter-spacing:-.01em;font-variant-numeric:tabular-nums;
+    display:flex;align-items:baseline;justify-content:center;white-space:nowrap;color:#d9ffe0;text-shadow:0 0 1.4cqw rgba(93,255,107,.55)}
+  .time .cs{font-weight:600;font-size:.4em;margin-left:.2em;color:var(--amber);text-shadow:none}
+  .time .hr{color:#58a863}
+
+  .msgs{position:absolute;left:1.4cqw;top:4.4cqw;font-size:1.75cqw;line-height:1.5;text-shadow:0 1px 2px #000,0 0 6px #000;pointer-events:none}
+  .msgs div{color:#ffe98a;animation:msg 7s forwards}
+  .msgs div i{font-style:normal;color:#9aeaff;font-family:Oxanium}
+  @keyframes msg{0%,80%{opacity:1}100%{opacity:0}}
+  .alert{position:absolute;top:12.4cqw;left:0;right:0;text-align:center;font-weight:700;letter-spacing:.2em;font-size:2.7cqw;
+    color:#fff1a8;opacity:0;pointer-events:none;text-shadow:0 0 14px rgba(255,210,58,.7),0 2px 3px #000}
+  .alert.show{animation:alert 2s ease-out}
+  @keyframes alert{0%{opacity:0;transform:translateY(-1cqw)}12%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
+
+  /* building render states */
+  .ghost *{fill:none!important;stroke:var(--grn);stroke-width:1;stroke-dasharray:4 4;opacity:0}
+  .ghost.up *{opacity:.3}
+  .ghost.sel *{opacity:.95;stroke-dasharray:none;stroke-width:1.6;filter:url(#glow)}
+  .wire *{fill:rgba(78,201,255,.08)!important;stroke:var(--cy);stroke-width:1.1}
+  .solid .ft{fill:url(#fT)} .solid .fl{fill:url(#fL)} .solid .fr{fill:url(#fR)}
+  .solid polygon,.solid rect,.solid path{stroke:#070b10;stroke-width:.7;stroke-linejoin:round}
+  .solid .lit{fill:#ffc24a;stroke:none;filter:url(#glow)}
+  .solid .dk{fill:#0a1016}
+  .solid .eng{fill:#ff7a2b;stroke:none;filter:url(#glow)}
+  .solid .acc{fill:#27506d}
+  .solid .pad{fill:#1c2a36}
+
+  /* ================= CONSOLE (matches the game's layout) ================= */
+  .console{position:relative;aspect-ratio:800/112;display:grid;grid-template-columns:16.6% 10.4% 31.4% 12% 9.6% 20%;
+    background:linear-gradient(180deg,#3b4349 0,#262c31 7%,#181d21 100%);
+    border-top:.4cqw solid #596269;box-shadow:inset 0 .2cqw 0 #8a949c}
+  .plate{position:relative;margin:1.1cqw .6cqw;background:linear-gradient(180deg,#2a3137,#161a1e);
+    box-shadow:inset 0 0 0 .25cqw #3d464d,inset 0 0 1.4cqw #000;
+    clip-path:polygon(1.2cqw 0,calc(100% - 1.2cqw) 0,100% 1.2cqw,100% calc(100% - 1.2cqw),calc(100% - 1.2cqw) 100%,1.2cqw 100%,0 calc(100% - 1.2cqw),0 1.2cqw)}
+  .plate::before{content:"";position:absolute;left:12%;right:12%;top:18%;bottom:18%;
+    background:repeating-linear-gradient(135deg,#0b0e10 0 .6cqw,#20272c .6cqw 1.2cqw);opacity:.55}
+  .well{position:relative;background:#020504;overflow:hidden;box-shadow:inset 0 0 1.6cqw #000,0 0 0 .22cqw #46535b}
+
+  /* minimap + its two buttons */
+  .mmwrap{display:flex;flex-direction:column;gap:.5cqw;padding:.7cqw 0 .8cqw .8cqw}
+  .mmbtns{display:grid;grid-template-columns:1fr 1fr;gap:.4cqw;height:2.7cqw}
+  .mmbtns div{background:linear-gradient(180deg,#2c353b,#141a1e);box-shadow:inset 0 0 0 .2cqw #4a565e;display:flex;align-items:center;justify-content:center}
+  .mmbtns svg{width:60%;height:70%}
+  .mm{flex:1}
+  .mm svg{display:block;width:100%;height:100%}
+
+  /* info */
+  .info{margin:.8cqw 0;display:grid;grid-template-columns:34% 1fr;gap:.4cqw;padding:.8cqw 1cqw;
+    border:.28cqw solid #2c4a31;background:#010403}
+  .wf{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4cqw;min-width:0}
+  .wf svg{width:100%;height:7.2cqw;filter:drop-shadow(0 0 .5cqw rgba(93,255,107,.6))}
+  .wf .pw *{fill:rgba(93,255,107,.12)!important;stroke:var(--grn)!important;stroke-width:1.1;stroke-dasharray:none!important;opacity:1!important}
+  .wf b{font-family:Oxanium;font-weight:600;font-size:1.6cqw;color:var(--grn);font-variant-numeric:tabular-nums}
+  .nfo{display:flex;flex-direction:column;justify-content:space-between;min-width:0;padding-left:.4cqw}
+  .nfo .nm{font-weight:700;font-size:1.85cqw;color:#f1f6f2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+  .nfo .st{font-size:1.6cqw;color:#cfe3d3;text-align:center;margin-top:-.2cqw}
+  .seg{display:flex;gap:.2cqw;height:1.3cqw;padding:.15cqw;border:.2cqw solid #2c4a31;background:#030a05}
+  .seg i{flex:1;background:#0b1a0e}
+  .seg i.on{background:var(--grn);box-shadow:0 0 .5cqw rgba(93,255,107,.7)}
+  .slots{display:grid;grid-template-columns:repeat(6,1fr);gap:.35cqw}
+  .slots div{height:3.1cqw;display:flex;align-items:center;justify-content:center;font-family:Oxanium;font-weight:800;font-size:2.2cqw;
+    color:#1f6b2b;background:#06100a;border:.22cqw solid #1d4a27}
+  .slots div.on{color:var(--grn);border-color:var(--grn);box-shadow:0 0 .8cqw rgba(93,255,107,.55);animation:pulse 1s infinite alternate}
+  .slots div.done{color:#031a08;background:var(--grn2);border-color:#7dff8a}
+  @keyframes pulse{to{background:#0d2a14}}
+
+  /* portrait + menu */
+  .portwrap{display:flex;flex-direction:column;gap:.5cqw;padding:.8cqw .5cqw .8cqw}
+  .menu{height:2.5cqw;background:linear-gradient(180deg,#34404a,#171d22);box-shadow:inset 0 0 0 .2cqw #556772;display:flex;align-items:center;justify-content:center;
+    font-size:1.55cqw;color:#cfe3d3;margin-left:1.4cqw}
+  .portrait{flex:1;margin-left:0}
+  .portrait svg{display:block;width:100%;height:100%}
+
+  /* command card */
+  .cmdwrap{position:relative;padding:1.6cqw 1cqw .9cqw .9cqw;background:linear-gradient(180deg,#2f373d,#14181b);box-shadow:inset 0 .2cqw 0 #55616a}
+  .lamps{position:absolute;top:.55cqw;left:1.4cqw;right:1.4cqw;display:flex;justify-content:space-between;padding:0 .4cqw}
+  .lamps i{width:3.6cqw;height:.7cqw;background:#e32a1e;border-radius:.3cqw .3cqw 0 0;box-shadow:0 0 .9cqw #ff3b30,0 .15cqw 0 #5c0f0a}
+  .cmd{height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:.45cqw;
+    grid-template-areas:"go lap rst" "sfx fs x1" "x2 x3 x4"}
+  .cmd button,.cmd .slot{position:relative;font:inherit;color:var(--txt);cursor:pointer;padding:0;
+    border:.38cqw solid transparent;
+    background:linear-gradient(#10161a,#0a0e11) padding-box,repeating-linear-gradient(135deg,#d9b400 0 .55cqw,#17140a .55cqw 1.1cqw) border-box;
+    transition:filter .15s,transform .08s}
+  .cmd .slot{cursor:default;opacity:.55}
+  .cmd button:hover:not(:disabled){filter:brightness(1.4)}
+  .cmd button:active:not(:disabled){transform:translateY(.2cqw)}
+  .cmd button:disabled{opacity:.35;cursor:default}
+  .cmd svg{position:absolute;left:18%;top:14%;width:64%;height:50%}
+  .cmd .k{position:absolute;right:.35cqw;bottom:.15cqw;font-size:1.3cqw;font-weight:700;color:#ffe98a}
+  .cmd .lb{position:absolute;left:0;right:0;bottom:.15cqw;text-align:center;font-size:1.15cqw;font-weight:700;color:#cfe3d3}
+  #go{grid-area:go}#lap{grid-area:lap}#rst{grid-area:rst}#sfx{grid-area:sfx}#fs{grid-area:fs}
+  #go.run{background:linear-gradient(#1a0d0b,#0d0605) padding-box,repeating-linear-gradient(135deg,#d93a2b 0 .55cqw,#17080a .55cqw 1.1cqw) border-box}
+
+  /* ---- narrow screens: drop decorative plates, enlarge touch targets ---- */
+  @container (max-width:640px){
+    .plate,.portwrap{display:none}
+    .console{grid-template-columns:27% 40% 33%;aspect-ratio:800/190}
+    .res{font-size:3cqw}.res svg{width:3cqw;height:3cqw}
+    .clock{padding-bottom:1.2cqw}.time{font-size:10cqw}.clock small{font-size:1.7cqw}
+    .msgs{font-size:2.6cqw;top:7cqw}.alert{top:17cqw;font-size:3.6cqw}
+    .info{padding:1.2cqw}.wf svg{height:11cqw}.wf b{font-size:2.4cqw}
+    .nfo .nm{font-size:2.8cqw}.nfo .st{font-size:2.4cqw}.slots div{height:4.6cqw;font-size:3.2cqw}.seg{height:2cqw}
+    .cmdwrap{padding-top:2.2cqw}.cmd .k{font-size:2cqw}.cmd .lb{font-size:1.7cqw}.lamps i{height:1cqw}
+    .mmbtns{height:4cqw}
+  }
+  @media (prefers-reduced-motion:reduce){.alert.show,.flash.go,.msgs div,.slots div.on{animation:none}}
+</style>
+</head>
+<body>
+<div class="screen" id="screen">
+
+  <div class="view">
+    <svg viewBox="0 0 800 435" id="scene" preserveAspectRatio="xMidYMid slice" aria-label="테란 기지">
+      <defs>
+        <linearGradient id="gnd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#47364a"/><stop offset=".5" stop-color="#55435a"/><stop offset="1" stop-color="#34283a"/></linearGradient>
+        <linearGradient id="fT" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bcc9d4"/><stop offset="1" stop-color="#7f8f9e"/></linearGradient>
+        <linearGradient id="fL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d8c9a"/><stop offset="1" stop-color="#4c5a67"/></linearGradient>
+        <linearGradient id="fR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f5c69"/><stop offset="1" stop-color="#2b353f"/></linearGradient>
+        <linearGradient id="mine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a9f1ff"/><stop offset=".55" stop-color="#3da7ee"/><stop offset="1" stop-color="#1b5fa8"/></linearGradient>
+        <linearGradient id="trail" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffb35c"/><stop offset="1" stop-color="#ff7a2b" stop-opacity="0"/></linearGradient>
+        <linearGradient id="dark" x1="0" y1="0" x2="1" y2="0"><stop offset=".62" stop-color="#050a07" stop-opacity="0"/><stop offset="1" stop-color="#050a07" stop-opacity=".78"/></linearGradient>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 .75  0 0 0 0 .6  0 0 0 0 .8  0 0 0 .22 0"/></filter>
+        <radialGradient id="mglow"><stop offset="0" stop-color="#4ec9ff" stop-opacity=".30"/><stop offset="1" stop-color="#4ec9ff" stop-opacity="0"/></radialGradient>
+      </defs>
+
+      <rect width="800" height="435" fill="url(#gnd)"/>
+      <rect width="800" height="435" filter="url(#noise)"/>
+      <path d="M0 0H800V40L735 52 650 36 560 50 470 34 380 54 290 38 200 52 110 36 40 50 0 42Z" fill="#17101b"/>
+      <path d="M0 42L40 50 110 36 200 52 290 38 380 54 470 34 560 50 650 36 735 52 800 40" fill="none" stroke="#7a6684" stroke-width="2" opacity=".5"/>
+      <g id="rocks" fill="#3a2c40" stroke="#120b16" stroke-width=".8"></g>
+      <ellipse cx="90" cy="215" rx="150" ry="150" fill="url(#mglow)"/>
+      <g id="minerals"></g>
+      <g id="geyser">
+        <ellipse cx="170" cy="372" rx="34" ry="16" fill="#120d14" stroke="#4a3a52" stroke-width="2"/>
+        <ellipse cx="170" cy="370" rx="22" ry="9" fill="#1d4a26"/>
+        <path d="M160 366q-4-20 4-34t-2-26" stroke="#7dff9a" stroke-width="3" fill="none" opacity=".35" stroke-linecap="round"><animate attributeName="opacity" values=".15;.5;.15" dur="2.2s" repeatCount="indefinite"/></path>
+      </g>
+
+      <g id="structs"></g>
+      <g id="scvs"></g>
+
+      <g id="weld" opacity="0">
+        <line id="scan" stroke="#4ec9ff" stroke-width="1.8" filter="url(#glow)"/>
+        <g id="sparks"></g>
+        <g id="builder"></g>
+        <g id="pbar"><rect x="-26" y="-3" width="52" height="6" fill="#02080c" stroke="#3b5163"/><rect id="pfill" x="-25" y="-2" width="0" height="4" fill="#5dff6b"/></g>
+      </g>
+      <rect width="800" height="435" fill="url(#dark)"/>
+    </svg>
+    <div class="vignette"></div>
+
+    <div class="clock"><small>경과 시간</small><div class="time" id="time">00:00<span class="cs">.00</span></div></div>
+    <div class="res">
+      <span><svg viewBox="0 0 16 16"><path d="M8 0 L14 5 L11.5 16 L4.5 16 L2 5Z" fill="#59c7ff"/><path d="M8 0V16" stroke="#0b2833"/></svg><b id="min">50</b></span>
+      <span><svg viewBox="0 0 16 16"><rect x="3" y="1" width="10" height="14" rx="3" fill="#5dff6b"/><rect x="5" y="4" width="6" height="3" fill="#06210e"/></svg><b id="gas">0</b></span>
+      <span id="supw"><svg viewBox="0 0 16 16"><circle cx="8" cy="5" r="3.2" fill="#59c7ff"/><path d="M2 15c0-4 3-6 6-6s6 2 6 6z" fill="#59c7ff"/></svg><b id="sup">6/15</b></span>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="alert" id="alert"></div>
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <div class="console">
+    <div class="mmwrap">
+      <div class="mmbtns">
+        <div><svg viewBox="0 0 24 12"><rect x="1" y="2" width="6" height="8" fill="#ffd23a"/><rect x="9" y="2" width="6" height="8" fill="#ffd23a" opacity=".6"/><rect x="17" y="2" width="6" height="8" fill="#ffd23a" opacity=".3"/></svg></div>
+        <div><svg viewBox="0 0 24 12"><path d="M3 6a9 9 0 0 1 18 0M6 6a6 6 0 0 1 12 0M9 6a3 3 0 0 1 6 0" fill="none" stroke="#ffd23a" stroke-width="1.6"/></svg></div>
+      </div>
+      <div class="well mm">
+        <svg viewBox="0 0 100 100" id="mmsvg" preserveAspectRatio="none">
+          <rect width="100" height="100" fill="#05100a"/>
+          <path d="M0 78L18 70 30 82 52 74 68 86 100 72V100H0Z" fill="#0b2014"/>
+          <path d="M66 0L78 14 100 10V0Z" fill="#0b2014"/>
+          <g id="mmdots"></g>
+          <circle cx="90" cy="14" r="2.2" fill="#ff4d4d"/>
+          <g id="mmb"></g>
+          <circle id="mmbc" r="1.4" fill="#fff" opacity="0"/>
+          <rect x="21" y="34.4" width="58" height="31.2" fill="none" stroke="#fff" stroke-width=".7" opacity=".9"/>
+          <g id="pings"></g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="plate"></div>
+
+    <div class="info well">
+      <div class="wf"><svg id="ptr" viewBox="0 0 100 100"></svg><b id="hpn">60/60</b></div>
+      <div class="nfo">
+        <div class="nm" id="nm">테란 SCV</div>
+        <div class="st" id="st">대기 중</div>
+        <div class="seg" id="seg"></div>
+        <div class="slots" id="slots"></div>
+      </div>
+    </div>
+
+    <div class="plate"></div>
+
+    <div class="portwrap">
+      <div class="menu">메뉴</div>
+      <div class="well portrait">
+        <svg viewBox="0 0 100 100" id="face">
+          <defs><radialGradient id="pb" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#23323a"/><stop offset="1" stop-color="#050a0c"/></radialGradient></defs>
+          <rect width="100" height="100" fill="url(#pb)"/>
+          <path d="M14 100c2-26 16-34 36-34s34 8 36 34z" fill="#51606a"/>
+          <path d="M30 56c0-24 9-38 20-38s20 14 20 38c0 14-9 22-20 22S30 70 30 56z" fill="#6c7d88"/>
+          <path d="M33 48c0-20 8-30 17-30s17 10 17 30z" fill="#8393a0"/>
+          <rect x="34" y="42" width="32" height="13" rx="5" fill="#2a1d05"/>
+          <rect x="36" y="44" width="28" height="9" rx="4" fill="#ffb81f"><animate attributeName="opacity" values="1;.55;1" dur="2.6s" repeatCount="indefinite"/></rect>
+          <rect x="38" y="46" width="12" height="2" fill="#fff4c4" opacity=".7"/>
+          <rect x="44" y="64" width="12" height="3" rx="1.5" fill="#2c3942"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="cmdwrap">
+      <div class="lamps"><i></i><i></i><i></i></div>
+      <div class="cmd">
+        <button id="go" title="시작 / 정지 (Space)"><svg id="goi" viewBox="0 0 24 24"></svg><span class="lb" id="gol">시작</span><span class="k">␣</span></button>
+        <button id="lap" disabled title="랩 (L)"><svg viewBox="0 0 24 24"><path d="M6 21V3M6 4h12l-3 4 3 4H6" fill="none" stroke="#ffd23a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="lb">랩</span><span class="k">L</span></button>
+        <button id="rst" disabled title="초기화 (R)"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5" fill="none" stroke="#9aeaff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lb">초기화</span><span class="k">R</span></button>
+        <button id="sfx" title="사운드 (M)"><svg id="sfxi" viewBox="0 0 24 24"></svg><span class="lb">소리</span><span class="k">M</span></button>
+        <button id="fs" title="전체화면 (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="#e7efe9" stroke-width="2.4" stroke-linecap="round"/></svg><span class="lb">전체화면</span><span class="k">F</span></button>
+        <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const pad = (n, l = 2) => String(n).padStart(l, '0');
+const clamp = v => Math.max(0, Math.min(1, v));
+const mk = (t, at = {}, p) => { const e = document.createElementNS(NS, t); for (const k in at) e.setAttribute(k, at[k]); p && p.appendChild(e); return e; };
+
+/* ---------- isometric helpers ---------- */
+function box(cx, cy, w, d, h, z = 0) {
+  cy -= z;
+  const L = [cx - w / 2, cy], Bt = [cx, cy + d / 2], R = [cx + w / 2, cy], T = [cx, cy - d / 2];
+  const up = p => [p[0], p[1] - h], s = a => a.map(p => p.join(',')).join(' ');
+  return `<polygon class="fl" points="${s([L, Bt, up(Bt), up(L)])}"/><polygon class="fr" points="${s([Bt, R, up(R), up(Bt)])}"/><polygon class="ft" points="${s([up(T), up(R), up(Bt), up(L)])}"/>`;
+}
+function face(side, cx, cy, w, d, h, u0, u1, v0, v1, cls, z = 0) {
+  cy -= z;
+  const A = side === 'l' ? [cx - w / 2, cy] : [cx, cy + d / 2], Bp = side === 'l' ? [cx, cy + d / 2] : [cx + w / 2, cy];
+  const P = (u, v) => [A[0] + (Bp[0] - A[0]) * u, A[1] + (Bp[1] - A[1]) * u - v * h];
+  return `<polygon class="${cls}" points="${[P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)].map(p => p.join(',')).join(' ')}"/>`;
+}
+const diamond = (cx, cy, w, d) => `<polygon points="${cx - w / 2},${cy} ${cx},${cy + d / 2} ${cx + w / 2},${cy} ${cx},${cy - d / 2}"/>`;
+
+/* ---------- build order: 6 stages across one minute ---------- */
+const B = [
+  { id:'cc', kr:'테란 커맨드 센터', max:1500, s:0, d:9.5, fp:[300,262,200,100],
+    shape: () => box(300,262,200,100,46) + box(300,262,124,62,38,46) + box(300,262,50,25,22,84)
+      + face('l',300,262,200,100,46,.10,.30,.30,.62,'lit') + face('l',300,262,200,100,46,.40,.60,.05,.55,'dk') + face('l',300,262,200,100,46,.70,.90,.30,.62,'lit')
+      + face('r',300,262,200,100,46,.12,.32,.30,.62,'lit') + face('r',300,262,200,100,46,.68,.88,.30,.62,'lit')
+      + `<rect class="acc" x="298" y="128" width="4" height="30"/><rect class="lit" x="296" y="124" width="8" height="5"/>` },
+  { id:'depot', kr:'테란 서플라이 디팟', max:400, s:10, d:9.5, fp:[425,350,86,43],
+    shape: () => box(425,350,86,43,22) + face('l',425,350,86,43,22,.15,.85,.25,.40,'dk') + face('l',425,350,86,43,22,.15,.85,.55,.70,'dk') + `<rect class="lit" x="421" y="323" width="8" height="3"/>` },
+  { id:'rax', kr:'테란 배럭', max:1000, s:20, d:9.5, fp:[525,266,134,67],
+    shape: () => box(525,266,134,67,44) + box(490,252,34,17,34,44) + face('l',525,266,134,67,44,.14,.40,.08,.55,'dk') + face('l',525,266,134,67,44,.55,.9,.50,.76,'lit') + face('r',525,266,134,67,44,.20,.80,.50,.74,'lit') },
+  { id:'fact', kr:'테란 팩토리', max:1250, s:30, d:9.5, fp:[665,324,150,75],
+    shape: () => box(665,324,150,75,52) + box(640,310,22,11,16,52) + box(668,322,22,11,16,52) + box(708,332,16,8,44,52) + box(722,338,12,6,40,52)
+      + face('l',665,324,150,75,52,.12,.38,.05,.55,'dk') + face('l',665,324,150,75,52,.55,.90,.55,.78,'lit') + face('r',665,324,150,75,52,.20,.70,.45,.68,'lit') },
+  { id:'port', kr:'테란 스타포트', max:1300, s:40, d:9.5, fp:[625,196,140,70],
+    shape: () => box(625,196,140,70,40) + box(580,182,22,11,52,40) + `<polygon class="pad" points="625,${196-60} 665,${196-40} 625,${196-20} 585,${196-40}"/><polygon class="lit" points="625,${196-46} 641,${196-40} 625,${196-34} 609,${196-40}"/>`
+      + face('l',625,196,140,70,40,.12,.36,.06,.62,'dk') + face('r',625,196,140,70,40,.25,.75,.38,.62,'lit') },
+  { id:'bc', kr:'테란 배틀크루저', max:500, s:50, d:7, ship:true, fp:null, tf:'translate(180 -30) scale(1.36)',
+    shape: () => `<polygon class="fl" points="206,88 318,80 376,92 318,104 206,98 192,93"/><polygon class="ft" points="236,80 270,80 274,66 244,66"/>
+      <polygon class="fr" points="250,104 300,104 290,110 258,110"/><rect class="dk" x="300" y="89" width="40" height="6"/><rect class="lit" x="248" y="70" width="18" height="3"/>
+      <circle class="eng" cx="194" cy="90" r="3.4"/><circle class="eng" cx="194" cy="97" r="3.4"/>` },
+];
+
+const structs = $('structs'), defs = $('scene').querySelector('defs');
+B.forEach(b => {
+  const g = mk('g', {}, structs); b.g = g;
+  const pos = mk('g', b.tf ? { transform: b.tf } : {}, g);
+  if (b.ship) b.trail = mk('rect', { x: 0, y: 0, width: 0, height: 14, fill: 'url(#trail)', opacity: 0 }, g);
+  if (b.fp) {
+    b.shadow = mk('g', { opacity: 0, transform: 'translate(14 10)' }, pos); b.shadow.innerHTML = diamond(b.fp[0], b.fp[1], b.fp[2] * 1.04, b.fp[3] * 1.04);
+    b.shadow.firstChild.setAttribute('fill', '#000'); b.shadow.firstChild.setAttribute('opacity', .4);
+    b.ghost = mk('g', { class: 'ghost' }, pos); b.ghost.innerHTML = diamond(...b.fp);
+  }
+  b.wire = mk('g', { class: 'wire', opacity: 0 }, pos); b.wire.innerHTML = b.shape();
+  const cp = mk('clipPath', { id: 'cp-' + b.id }, defs); b.clip = mk('rect', {}, cp);
+  b.solid = mk('g', { class: 'solid', 'clip-path': `url(#cp-${b.id})` }, pos); b.solid.innerHTML = b.shape();
+  const bb = b.solid.getBBox(); b.bb = bb; b.x0 = bb.x; b.x1 = bb.x + bb.width; b.top = bb.y; b.bot = bb.y + bb.height;
+  b.clip.setAttribute('x', bb.x - 6); b.clip.setAttribute('width', bb.width + 12); b.clip.setAttribute('y', bb.y + bb.height); b.clip.setAttribute('height', 0);
+  b.fcx = b.fp ? b.fp[0] : 560; b.fcy = b.fp ? b.fp[1] : 90;
+});
+[B[4], B[0], B[2], B[3], B[1], B[5]].forEach(b => structs.appendChild(b.g));
+
+// mineral field (big cluster along the left edge, like the game)
+const minG = $('minerals');
+[[40,92],[68,70],[100,56],[36,138],[62,168],[30,200],[58,230],[40,266],[68,296],[100,322],[92,112],[88,262]].forEach(([x, y], i) => {
+  const g = mk('g', { transform: `translate(${x} ${y})` }, minG), s = 1.5 + (i % 4) * .14;
+  g.innerHTML = `<ellipse cx="2" cy="14" rx="26" ry="9" fill="#000" opacity=".45"/>
+    <polygon points="-14,10 -8,-16 -1,-4 3,-26 12,-8 18,10" fill="url(#mine)" stroke="#06202e" stroke-width="1" transform="scale(${s})"/>
+    <polygon points="-1,-4 3,-26 12,-8 6,10 -1,10" fill="#eafcff" opacity=".4" transform="scale(${s})"/>`;
+});
+[[410,150,26],[250,112,18],[480,400,22],[330,395,30],[760,200,24],[720,410,28],[560,120,16],[210,330,20]].forEach(([x, y, r]) => {
+  mk('polygon', { points: `${x - r},${y} ${x - r / 2},${y - r * .6} ${x + r / 3},${y - r * .7} ${x + r},${y - r * .1} ${x + r * .6},${y + r * .4} ${x - r * .5},${y + r * .4}` }, $('rocks'));
+});
+
+const mm = (x, y) => [21 + x / 800 * 58, 34.4 + y / 435 * 31.2];
+[[40,92],[68,70],[36,138],[30,200],[40,266]].forEach(([x, y]) => { const [a, b] = mm(x, y); mk('circle', { cx: a, cy: b, r: 1.1, fill: '#3da7ee' }, $('mmdots')); });
+B.forEach(b => { if (b.ship) return; const [x, y] = mm(b.fcx, b.fcy); b.mm = mk('rect', { x: x - 2.2, y: y - 1.4, width: 4.4, height: 2.8, fill: '#5dff6b', opacity: 0 }, $('mmb')); });
+
+const SCV = `<g><ellipse cx="0" cy="5" rx="7" ry="2.4" fill="#000" opacity=".4"/><path d="M-6 3L6 3L8 -2L3 -6L-5 -5L-8 -1Z" fill="#c8d2db" stroke="#070b10" stroke-width=".7"/><rect x="-3.4" y="-4" width="5" height="3" fill="#4ec9ff"/><line x1="6" y1="0" x2="12" y2="5" stroke="#c8d2db" stroke-width="1.6"/></g>`;
+const workers = [];
+for (let i = 0; i < 4; i++) { const g = mk('g', {}, $('scvs')); g.innerHTML = SCV + '<polygon class="cr" points="-1,-10 2,-6 0,-3 -3,-6" fill="url(#mine)" opacity="0"/>'; workers.push({ g, cr: g.querySelector('.cr') }); }
+$('builder').innerHTML = SCV;
+const sparks = []; for (let i = 0; i < 9; i++) sparks.push(mk('circle', { r: 1.2, fill: i % 2 ? '#ffd27a' : '#fff' }, $('sparks')));
+
+/* ---------- info panel ---------- */
+const SCV_WF = `<g class="pw"><polygon points="20,70 80,70 92,44 62,20 28,26 10,48"/><rect x="34" y="30" width="28" height="18"/><line x1="76" y1="52" x2="96" y2="76" stroke-width="5"/></g>`;
+let shownB = null;
+function showWire(b) {
+  const p = $('ptr'); shownB = b;
+  if (!b) { p.setAttribute('viewBox', '0 0 100 100'); p.innerHTML = SCV_WF; return; }
+  const bb = b.bb, q = 6, w = bb.width + q * 2, h = bb.height + q * 2, s = Math.max(w, h);
+  p.setAttribute('viewBox', `${bb.x - q - (s - w) / 2} ${bb.y - q - (s - h) / 2} ${s} ${s}`);
+  p.innerHTML = `<g class="pw" ${b.tf ? `transform="${b.tf}"` : ''}>${b.shape()}</g>`;
+}
+const SEG = 22; $('seg').innerHTML = '<i></i>'.repeat(SEG);
+const segs = [...$('seg').children];
+$('slots').innerHTML = B.map((_, i) => `<div>${i + 1}</div>`).join('');
+const slotEls = [...$('slots').children];
+showWire(null);
+
+function setInfo(nm, st, hp, max, pct) {
+  $('nm').textContent = nm; $('st').textContent = st; $('hpn').textContent = `${hp}/${max}`;
+  const n = Math.round(pct / 100 * SEG); segs.forEach((e, i) => e.classList.toggle('on', i < n));
+}
+
+/* ---------- audio (synth) ---------- */
+let ac = null, sfx = true;
+function beep(f = 880, d = .06, type = 'square', v = .035) {
+  if (!sfx) return;
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f; g.gain.value = v;
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + d); o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+  } catch (e) {}
+}
+const chime = () => { [520, 780, 1040].forEach((f, i) => setTimeout(() => beep(f, i === 2 ? .16 : .09, 'triangle', .05), i * 80)); };
+const launchSnd = () => { [200, 320, 480, 760].forEach((f, i) => setTimeout(() => beep(f, .32, 'sawtooth', .03), i * 110)); };
+
+/* ---------- state ---------- */
+let elapsed = 0, base = 0, running = false, raf = 0, laps = [], lastDone = -1, lastMin = 0, launched = false, lastActive = null;
+const fmtT = ms => `${pad(Math.floor(ms / 60000))}:${pad(Math.floor(ms / 1000) % 60)}.${pad(Math.floor(ms / 10) % 100)}`;
+function alertMsg(t) { const el = $('alert'); el.textContent = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function addMsg(a, b) {
+  const d = document.createElement('div'); d.innerHTML = `${a} <i>${b}</i>`; $('msgs').appendChild(d);
+  while ($('msgs').children.length > 5) $('msgs').firstChild.remove(); setTimeout(() => d.remove(), 7200);
+}
+function ping(b) {
+  const [x, y] = mm(b.fcx, b.fcy), c = mk('circle', { cx: x, cy: y, r: 3, fill: 'none', stroke: '#ffe14d', 'stroke-width': .8 }, $('pings'));
+  c.innerHTML = '<animate attributeName="r" from="3" to="22" dur=".9s" fill="freeze"/><animate attributeName="opacity" from="1" to="0" dur=".9s" fill="freeze"/>';
+  setTimeout(() => c.remove(), 1000);
+}
+
+function render() {
+  const t = elapsed / 1000, sec = t % 60, min = Math.floor(t / 60);
+  const cs = pad(Math.floor(elapsed / 10) % 100), s = Math.floor(t) % 60, m = Math.floor(t / 60) % 60, h = Math.floor(t / 3600);
+  $('time').innerHTML = `${h ? `<span class="hr">${h}:</span>` : ''}${pad(m)}:${pad(s)}<span class="cs">.${cs}</span>`;
+  document.title = elapsed ? `${pad(m)}:${pad(s)} · 테란` : '테란 · 스탑워치';
+
+  $('min').textContent = Math.floor(50 + t * 13.5); $('gas').textContent = Math.floor(Math.max(0, t - 8) * 5.5);
+  const cap = Math.min(200, 15 + (sec >= B[1].s + B[1].d ? 8 : 0) + min * 8), used = Math.min(cap, 6 + Math.floor(sec / 3.2) + min * 6);
+  $('sup').textContent = `${used}/${cap}`; $('supw').classList.toggle('block', used >= cap);
+
+  workers.forEach((w, i) => {
+    const ph = ((t / 5.2) + i / 4) % 1, out = ph < .5, f = out ? ph * 2 : 1 - (ph - .5) * 2;
+    const sx = 222, sy = 250 + (i - 1.5) * 12, ex = 116, ey = 112 + i * 62;
+    w.g.setAttribute('transform', `translate(${sx + (ex - sx) * f} ${sy + (ey - sy) * f + Math.sin(t * 14 + i) * .8}) scale(${out ? -1 : 1} 1)`);
+    w.cr.setAttribute('opacity', out ? 0 : 1);
+  });
+
+  let active = null;
+  B.forEach((b, i) => {
+    const p = clamp((sec - b.s) / b.d), hgt = b.bot - b.top, isA = p > 0 && p < 1;
+    b.clip.setAttribute('y', b.bot - hgt * p); b.clip.setAttribute('height', hgt * p + 1);
+    b.wire.setAttribute('opacity', isA ? .95 : 0);
+    if (b.ghost) { b.ghost.setAttribute('class', 'ghost' + (isA ? ' sel' : p === 0 ? ' up' : '')); b.shadow.setAttribute('opacity', p); }
+    if (b.mm) b.mm.setAttribute('opacity', p === 0 ? 0 : .35 + .65 * p);
+    slotEls[i].className = p >= 1 ? 'done' : isA ? 'on' : '';
+    if (isA) active = { b, p };
+  });
+  if (active) lastActive = active;
+
+  const bc = B[5], k = clamp((sec - 57) / 3), dx = Math.pow(k, 3) * 520;
+  bc.g.setAttribute('transform', `translate(${dx} ${-k * 26})`);
+  const tl = Math.min(260, dx * .7); bc.trail.setAttribute('x', 192 * 1.36 + 180 - tl + 6); bc.trail.setAttribute('y', 87 * 1.36 - 30); bc.trail.setAttribute('width', tl); bc.trail.setAttribute('opacity', k > 0 ? .9 : 0);
+  const mc = mm(560 + dx * .6, 95 - k * 20); $('mmbc').setAttribute('cx', mc[0]); $('mmbc').setAttribute('cy', mc[1]); $('mmbc').setAttribute('opacity', sec >= 50 ? 1 : 0);
+
+  const weld = $('weld');
+  if (active) {
+    const { b, p } = active, sh = b.ship, ys = sh ? 1.36 : 1, y0 = sh ? 180 : 0, yo = sh ? -30 : 0;
+    const y = b.bot - (b.bot - b.top) * p, yy = sh ? y * 1.36 - 30 : y, bx0 = sh ? b.x0 * 1.36 + 180 : b.x0, bx1 = sh ? b.x1 * 1.36 + 180 : b.x1;
+    weld.setAttribute('opacity', 1);
+    const sc = $('scan'); sc.setAttribute('x1', bx0 - 6); sc.setAttribute('x2', bx1 + 6); sc.setAttribute('y1', yy); sc.setAttribute('y2', yy);
+    const sx = bx0 + (bx1 - bx0) * (.5 + .5 * Math.sin(t * 2.3));
+    $('builder').setAttribute('transform', `translate(${sx} ${yy - 8})`);
+    sparks.forEach((c, i) => { const r = Math.sin(t * 40 + i * 12.9898) * 43758.5453, f = r - Math.floor(r);
+      c.setAttribute('cx', sx + 9 + (f - .5) * 12); c.setAttribute('cy', yy - 3 + ((f * 7) % 1) * 8); c.setAttribute('opacity', running ? f : .3); });
+    const px = (bx0 + bx1) / 2, py = (sh ? b.top * 1.36 - 30 : b.top) - 14;
+    $('pbar').setAttribute('transform', `translate(${px} ${py})`); $('pfill').setAttribute('width', 50 * p);
+  } else weld.setAttribute('opacity', 0);
+
+  // info panel (Korean, like the game)
+  const A = active || (elapsed > 0 ? lastActive : null);
+  if (elapsed === 0) { if (shownB !== null || !$('ptr').firstChild) showWire(null); setInfo('테란 SCV', '대기 중', 60, 60, 0); }
+  else if (A) {
+    if (shownB !== A.b) showWire(A.b);
+    const fin = !active, p = fin ? 1 : A.p, hp = Math.round(A.b.max * (.1 + .9 * p));
+    setInfo(A.b.kr, fin ? '완료' : (A.b.ship ? '조립 중' : '건설 중'), hp, A.b.max, Math.floor(p * 100));
+  }
+
+  const idx = B.findIndex(b => sec < b.s + b.d), done = idx === -1 ? 6 : idx;
+  if (running && lastDone !== -1 && done > lastDone) {
+    const b = B[done - 1]; alertMsg(b.ship ? '배틀크루저 출격 준비 완료' : `${b.kr.replace('테란 ', '')} 건설 완료`); chime(); b.fp && ping(b);
+    addMsg(`${b.kr.replace('테란 ', '')} 완료`, fmtT(elapsed));
+  }
+  lastDone = done;
+  if (running && sec >= 57 && !launched) { launched = true; launchSnd(); }
+  if (sec < 57) launched = false;
+  if (min !== lastMin) { lastMin = min; if (min > 0) { const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); alertMsg(`함대 +1  ·  총 ${min}척`); try { navigator.vibrate && navigator.vibrate([40, 30, 80]); } catch (e) {} } }
+}
+
+/* ---------- controls ---------- */
+const PLAY = '<path d="M6 3l15 9-15 9z" fill="#5dff6b"/>', STOP = '<rect x="5" y="5" width="14" height="14" fill="#ff3b30"/>';
+const SPK_ON = '<path d="M3 9v6h4l5 4V5L7 9zM16 8c2 2 2 6 0 8M19 5c4 4 4 10 0 14" fill="none" stroke="#e7efe9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+const SPK_OFF = '<path d="M3 9v6h4l5 4V5L7 9zM16 9l5 6M21 9l-5 6" fill="none" stroke="#7f948a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+$('goi').innerHTML = PLAY; $('sfxi').innerHTML = SPK_ON;
+
+function loop() { elapsed = performance.now() - base; render(); raf = requestAnimationFrame(loop); }
+function toggle() {
+  if (running) { running = false; cancelAnimationFrame(raf); elapsed = performance.now() - base; render(); $('goi').innerHTML = PLAY; $('gol').textContent = '계속'; $('go').classList.remove('run'); beep(330, .08); }
+  else { running = true; base = performance.now() - elapsed; lastDone = -1; raf = requestAnimationFrame(loop); $('goi').innerHTML = STOP; $('gol').textContent = '정지'; $('go').classList.add('run');
+    $('lap').disabled = $('rst').disabled = false; beep(880, .07); if (elapsed === 0) addMsg('빌드 오더 시작', '00:00.00');
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {} }
+}
+function lap() {
+  if (!running) return; const prev = laps.length ? laps[laps.length - 1] : 0; laps.push(elapsed); beep(1200, .04);
+  addMsg(`웨이포인트 ${pad(laps.length)}`, `${fmtT(elapsed)} (+${fmtT(elapsed - prev)})`);
+}
+function reset() {
+  running = false; cancelAnimationFrame(raf); elapsed = 0; laps = []; lastDone = -1; lastMin = 0; lastActive = null; $('msgs').innerHTML = '';
+  showWire(null); render(); $('goi').innerHTML = PLAY; $('gol').textContent = '시작'; $('go').classList.remove('run'); $('lap').disabled = $('rst').disabled = true;
+}
+function toggleSfx() { sfx = !sfx; $('sfxi').innerHTML = sfx ? SPK_ON : SPK_OFF; }
+function fullscreen() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+$('go').onclick = toggle; $('lap').onclick = lap; $('rst').onclick = reset; $('sfx').onclick = toggleSfx; $('fs').onclick = fullscreen;
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (e.code === 'Space') { e.preventDefault(); toggle(); } else if (k === 'l') lap(); else if (k === 'r') reset(); else if (k === 'm') toggleSfx(); else if (k === 'f') fullscreen();
+});
+render();
+</script>
+</body>
+</html>
